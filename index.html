@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Musique">
+<title>Télécharger une musique</title>
+<style>
+  :root{
+    --bg:#E4EAEE; --ink:#13242D; --muted:#5B6E78;
+    --blue:#2457F5; --field:#FFFFFF; --err:#B3261E; --ok:#1B7A4B;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#0F1A20; --ink:#E8EEF1; --muted:#8EA1AB; --field:#17262E; --blue:#6C8DFF; --err:#FF8A80; --ok:#6FD3A0; }
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:ui-rounded,"SF Pro Rounded",system-ui,sans-serif;
+    padding:env(safe-area-inset-top) 20px env(safe-area-inset-bottom);
+    display:flex; flex-direction:column; justify-content:center;
+  }
+  main{max-width:460px; width:100%; margin:0 auto}
+  h1{font-size:2rem; line-height:1.1; margin:0 0 .6rem; letter-spacing:-.02em}
+  p.lead{margin:0 0 1.6rem; color:var(--muted); line-height:1.5}
+  input{
+    width:100%; font:inherit; font-size:1rem; padding:16px;
+    border:2px solid transparent; border-radius:14px;
+    background:var(--field); color:var(--ink);
+  }
+  input:focus-visible,button:focus-visible{outline:3px solid var(--blue); outline-offset:2px}
+  button{
+    width:100%; margin-top:12px; padding:16px; font:inherit; font-weight:700;
+    font-size:1.05rem; border:0; border-radius:14px;
+    background:var(--blue); color:#fff; cursor:pointer;
+  }
+  button:disabled{opacity:.6}
+  #msg{min-height:1.5em; margin-top:1rem; line-height:1.4}
+  #msg.err{color:var(--err)} #msg.ok{color:var(--ok)}
+  small{display:block; margin-top:2rem; color:var(--muted); line-height:1.5}
+</style>
+</head>
+<body>
+<main>
+  <h1>Colle un lien, récupère la musique</h1>
+  <p class="lead">Suno, SoundCloud, YouTube et d'autres sites.</p>
+  <input id="url" type="url" inputmode="url" autocapitalize="off" autocorrect="off"
+         placeholder="https://suno.com/song/…" aria-label="Lien de la musique">
+  <button id="go">Télécharger</button>
+  <div id="msg" role="status" aria-live="polite"></div>
+  <small>Utilise cet outil uniquement pour de la musique dont tu as les droits : tes propres créations, ou des titres dont l'auteur autorise le téléchargement.</small>
+</main>
+<script>
+  const url = document.getElementById('url');
+  const go = document.getElementById('go');
+  const msg = document.getElementById('msg');
+
+  function say(text, cls){ msg.textContent = text; msg.className = cls || ''; }
+
+  go.addEventListener('click', async () => {
+    const link = url.value.trim();
+    if(!link){ say('Colle d\'abord un lien.', 'err'); return; }
+    go.disabled = true; say('Téléchargement en cours… (peut prendre un moment)');
+    try{
+      const res = await fetch('/api/download', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({url: link})
+      });
+      if(!res.ok){
+        let e = {}; try{ e = await res.json(); }catch(_){}
+        throw new Error(e.error || 'Le téléchargement a échoué.');
+      }
+      const name = decodeURIComponent(res.headers.get('X-Filename') || 'musique.mp3');
+      const blob = await res.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = name;
+      document.body.appendChild(a); a.click(); a.remove();
+      say('Terminé : ' + name, 'ok');
+    }catch(err){
+      say(err.message, 'err');
+    }finally{
+      go.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>
